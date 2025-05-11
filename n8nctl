@@ -4,12 +4,14 @@ cd "$(dirname "$(readlink -f "$0")")"
 
 CMD=${1:-help}
 
+sh_exec() { bash "$@"; }
+
 case $CMD in
   up)        docker compose up -d ;;
   down)      docker compose down ;;
-  backup)    ./scripts/backup.sh ;;
-  restore)   ./scripts/restore.sh "${2:-}" ;;
-  update)    ./scripts/update.sh "${2:-latest}" ;;
+  backup)    sh_exec scripts/backup.sh ;;
+  restore)   sh_exec scripts/restore.sh "${2:-}" ;;
+  update)    sh_exec scripts/update.sh "${2:-latest}" ;;
   logs)      docker compose logs -f n8n ;;
   version)   docker compose exec n8n n8n --version ;;
   help|*)    echo "n8nctl {up|down|backup|restore <ts>|update [tag]|logs|version}" ;;

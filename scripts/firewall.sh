@@ -3,7 +3,11 @@ set -euo pipefail
 
 ufw default deny incoming
 ufw default allow outgoing
-ufw allow OpenSSH
+if ufw app list | grep -qw OpenSSH; then
+  ufw allow OpenSSH
+else
+  ufw allow 22/tcp
+fi
 ufw allow http
 ufw allow https
 

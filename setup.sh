@@ -8,50 +8,72 @@ echo "== n8n stack bootstrap =="
 REPO_DIR="$(dirname "$(readlink -f "$0")")"
 cd "$REPO_DIR"
 
-# 1) Ask for env if .env doesn’t exist
+# 1) copy .env if missing
 if [[ ! -f .env ]]; then
-  echo "Copying .env.example → .env"
   cp .env.example .env
-  echo "Please edit .env now (at minimum DOMAIN_NAME, SUBDOMAIN, passwords)."
+  echo "Edit .env now (DOMAIN_NAME, passwords, etc.)"
   read -rp "Open editor? [y/N] " ans
-  [[ $ans == y* || $ans == Y* ]] && ${EDITOR:-nano} .env
+  [[ $ans == [yY]* ]] && ${EDITOR:-nano} .env
 fi
 
-# 2) Install prerequisites
+# 2) prerequisites
 apt-get update -y
 apt-get install -y ca-certificates curl gnupg lsb-release ufw rclone
 
+echo "[debug] PATH = $PATH"
+echo -n "[debug] which docker = "; which docker || echo "not found"
+echo -n "[debug] whereis docker = "; whereis docker
+
 # Docker Engine + compose‑plugin
-if ! command -v docker >/dev/null 2>&1; then
-  echo "Installing Docker Engine..."
-  install -m 0755 -d /etc/apt/keyrings
-  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
-    gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-  echo \
-    "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-    https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
-    > /etc/apt/sources.list.d/docker.list
-  apt-get update -y
-  apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+SKIP_DOCKER_INSTALL=${SKIP_DOCKER_INSTALL:-0}
+if ! command -v docker &>/dev/null; then
+  if [[ "$SKIP_DOCKER_INSTALL" == 1 ]]; then
+    echo "[setup] Docker already present – skipping engine install"
+  else
+    echo "Installing Docker Engine..."
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
+      gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    echo \
+      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+      https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
+      > /etc/apt/sources.list.d/docker.list
+    apt-get update -y
+    apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+  fi
 fi
 
-# 3) Firewall hardening
-./scripts/firewall.sh
+echo "[n8nctl debug] PATH=$PATH"
+which docker 2>/dev/null || echo "[n8nctl debug] 'docker' not in PATH"
 
-# 4) Bring the stack up
+# 3) **always** make n8nctl reachable
+CTL_SRC="$REPO_DIR/n8nctl"
+CTL_LINK="/usr/local/bin/n8nctl"
+chmod +x "$CTL_SRC"
+ln -sf "$CTL_SRC" "$CTL_LINK"
+echo "[setup] Linked n8nctl → $CTL_LINK"
+
+# 4) firewall hardening (unless skipped)
+SKIP_FIREWALL=${SKIP_FIREWALL:-0}
+if [[ "$SKIP_FIREWALL" == 0 ]]; then
+  ./scripts/firewall.sh
+else
+  echo "[setup] SKIP_FIREWALL=1 – skipping UFW rules"
+fi
+
+# 5) guarded compose pull + up
+set +e
 docker compose pull
 docker compose up -d
+COMPOSE_RC=$?
+set -e
 
-# 5) Make n8nctl globally available
-CTL_SRC="$(readlink -f "$REPO_DIR/n8nctl")"
-CTL_LINK="/usr/local/bin/n8nctl"
-
-chmod +x "$CTL_SRC"
-
-if [[ ! -L "$CTL_LINK" || "$(readlink -f "$CTL_LINK")" != "$CTL_SRC" ]]; then
-  ln -sf "$CTL_SRC" "$CTL_LINK"
-  echo "Linked n8nctl → $CTL_LINK"
+if [[ $COMPOSE_RC -ne 0 ]]; then
+  echo "[setup] ⚠️  docker compose up failed (rc=$COMPOSE_RC)."
+  echo "         Most likely missing or wrong vars in .env."
+  echo "         Fix them and run:  n8nctl up"
+else
+  echo "[setup] Stack is running.  Try:  n8nctl version"
 fi
 
-echo "n8n should be reachable at https://$(grep SUBDOMAIN .env | cut -d= -f2).$(grep DOMAIN_NAME .env | cut -d= -f2)"
-echo "You can now use the convenience CLI:  n8nctl backup | update | restore …"
+echo "== bootstrap done =="
