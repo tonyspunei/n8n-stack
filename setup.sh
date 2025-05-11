@@ -56,7 +56,7 @@ echo "[setup] Linked n8nctl → $CTL_LINK"
 # 4) firewall hardening (unless skipped)
 SKIP_FIREWALL=${SKIP_FIREWALL:-0}
 if [[ "$SKIP_FIREWALL" == 0 ]]; then
-  ./scripts/firewall.sh
+  bash ./scripts/firewall.sh
 else
   echo "[setup] SKIP_FIREWALL=1 – skipping UFW rules"
 fi
