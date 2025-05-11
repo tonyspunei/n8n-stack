@@ -6,7 +6,7 @@ if [[ $# -lt 1 ]]; then
 fi
 TS=$1
 ROOT="$(dirname "$(readlink -f "$0")")/.."
-source "$ROOT/.env"
+export $(grep -v '^#' "$ROOT/.env" | xargs -d '\n')
 compose() { docker compose -f "$ROOT/docker-compose.yml" "$@"; }
 
 compose stop n8n
