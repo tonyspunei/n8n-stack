@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$(readlink -f "$0")")"
+
+CMD=${1:-help}
+
+case $CMD in
+  up)        docker compose up -d ;;
+  down)      docker compose down ;;
+  backup)    ./scripts/backup.sh ;;
+  restore)   ./scripts/restore.sh "${2:-}" ;;
+  update)    ./scripts/update.sh "${2:-latest}" ;;
+  logs)      docker compose logs -f n8n ;;
+  version)   docker compose exec n8n n8n --version ;;
+  help|*)    echo "n8nctl {up|down|backup|restore <ts>|update [tag]|logs|version}" ;;
+esac
