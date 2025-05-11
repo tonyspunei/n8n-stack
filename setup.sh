@@ -8,6 +8,10 @@ echo "== n8n stack bootstrap =="
 REPO_DIR="$(dirname "$(readlink -f "$0")")"
 cd "$REPO_DIR"
 
+# --- NEW: ensure exec bits are present -------------------------------
+chmod +x n8nctl scripts/*.sh 2>/dev/null || true
+# ---------------------------------------------------------------------
+
 # 1) copy .env if missing
 if [[ ! -f .env ]]; then
   cp .env.example .env
